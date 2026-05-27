@@ -163,3 +163,4 @@ data/elliptic/*
 data/elliptic/raw/*
 !data/elliptic/raw/node_idx_map.pt
 !data/elliptic/raw/data_df.pkl
+logs/
