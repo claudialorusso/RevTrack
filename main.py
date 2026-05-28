@@ -45,6 +45,7 @@ def run_local(cfg: DictConfig):
             override_exp_edge_recommendation_cfg(cfg)
 
     # Set up the output directory.
+    """
     output_dir = Path(hydra_cfg.runtime.output_dir)
     if is_rank_zero:
         print(cyan(f"Outputs will be saved to:"), output_dir)
@@ -52,7 +53,7 @@ def run_local(cfg: DictConfig):
         (output_dir.parents[1] / "latest-run").symlink_to(
             output_dir, target_is_directory=True
         )
-
+    """
     # Set up logging with wandb.
     if cfg.wandb.mode != "disabled":
         # If resuming, merge into the existing run on wandb.
@@ -232,4 +233,8 @@ def run(cfg: DictConfig):
 
 
 if __name__ == "__main__":
+    start_time=time.time()
     run()
+    total_time=time.time() - start_time
+    print(f"Total time: {total_time:.2f}s")
+    print(f"Total time: {total_time / 60:2f}min")

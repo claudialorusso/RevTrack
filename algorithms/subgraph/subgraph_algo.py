@@ -12,7 +12,8 @@ from torchmetrics.classification import (
 )
 from algorithms.common.base_pytorch_algo import BasePytorchAlgo
 from .models import GNN, DoubleDeepSets
-
+import numpy as np
+from sklearn.metrics import precision_score, recall_score, f1_score
 
 model_registry = dict(bipartite_gnn=GNN, deepsets=DoubleDeepSets)
 
@@ -112,8 +113,66 @@ class SubgraphAlgo(BasePytorchAlgo):
 
     def on_test_end(self) -> None:
         conf_matrix = self.test_conf_matrix.compute()
+
         print("conf_matrix", conf_matrix)
+
         self.log_conf_matrix("final_test/conf_matrix", conf_matrix)
+
+        # =========================================================
+        # EXTRA METRICS
+        # =========================================================
+
+        cm = conf_matrix.detach().cpu().numpy()
+
+        TN, FP = cm[0]
+        FN, TP = cm[1]
+
+        accuracy = (TP + TN) / (TP + TN + FP + FN)
+
+        print("\n[CONFUSION MATRIX VALUES]")
+        print(f"TP: {TP}")
+        print(f"TN: {TN}")
+        print(f"FP: {FP}")
+        print(f"FN: {FN}")
+
+        print(f"\nAccuracy: {accuracy}")
+        y_true = []
+        y_pred = []
+
+        for true_label in [0, 1]:
+            for pred_label in [0, 1]:
+                count = cm[true_label, pred_label]
+
+                y_true.extend([true_label] * count)
+                y_pred.extend([pred_label] * count)
+
+        for avg in ["binary", "macro", "micro"]:
+            precision = precision_score(
+                y_true,
+                y_pred,
+                average=avg,
+                zero_division=0
+            )
+
+            recall = recall_score(
+                y_true,
+                y_pred,
+                average=avg,
+                zero_division=0
+            )
+
+            f1 = f1_score(
+                y_true,
+                y_pred,
+                average=avg,
+                zero_division=0
+            )
+
+            print(f"\n[{avg.upper()} METRICS]")
+            print("Precision:", precision)
+            print("Recall:", recall)
+            print("F1:", f1)
+
         return super().on_test_end()
 
     def _step(self, batch, namespace: str = "training"):
@@ -184,16 +243,21 @@ class SubgraphAlgo(BasePytorchAlgo):
             "nPredictions": "nPredictions",
         }
 
-        self.logger.experiment.log(
-            {
-                key: self.logger.experiment.plot_table(
-                    "wandb/confusion_matrix/v1",
-                    wandb.Table(
-                        columns=["Actual", "Predicted", "nPredictions"], data=data
+        if hasattr(self.logger.experiment, "log") and hasattr(self.logger.experiment, "plot_table"):
+            self.logger.experiment.log(
+                {
+                    key: self.logger.experiment.plot_table(
+                        "wandb/confusion_matrix/v1",
+                        wandb.Table(
+                            columns=["Actual", "Predicted", "nPredictions"], data=data
+                        ),
+                        fields,
+                        {"title": key},
+                        split_table=False,
                     ),
-                    fields,
-                    {"title": key},
-                    split_table=False,
-                ),
-            }
-        )
+                }
+            )
+        else:
+            print(f"\n{key}")
+            print("Confusion matrix:")
+            print(conf_matrix)
